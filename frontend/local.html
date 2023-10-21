@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tomato Plant Disease Prediction and Classification by Leaf Image Analysis</title>
+    <link rel="icon" type="image/x-icon" href="logo.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.js"></script>
+    <script src="https://unpkg.com/vue@2.6.11/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+	<script src="languages_translation.js" type="text/javascript"></script>
+    <style>
+        body {
+            text-align: center;
+        }
+        .columns {
+            display: flex;
+            justify-content: center;
+        }
+        .column {
+            flex: 1;
+        }
+        .chart-container {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <div class="my-3">
+            <div id="mainHeader">
+                <div class="d-inline-flex align-items-center justify-content-center">
+                    <img src="logo.png" alt="Logo" class="mx-auto d-block img-fluid" style="max-height: 10vh;"/>
+                </div>
+				<div class="text-center mx-3 py-2 h5 d-flex align-items-center justify-content-center" style="border-top: 1px solid; border-bottom: 1px solid;">
+					<a href="#" class="mx-2 link-danger" @click.prevent="reloadPage">{{ langCues[selectedLanguage][4] }}</a>	
+                     | 	
+                    <a href="#" class="mx-2 link-danger" @click.prevent="showAbout">{{ langCues[selectedLanguage][5] }}</a>
+					 |
+					<select v-model="selectedLanguage" class="form-select mx-2 bg-danger text-light text-center" style="max-width:105px;">
+						<option value="English">English</option>
+						<option value="Hindi">हिंदी</option>
+						<option value="Bengali">বাংলা</option>
+						<option value="Tamil">தமிழ்</option>
+					</select>
+				</div>
+            </div>
+            <div id="hideThis">
+                <input type="file" @change="onFileChange" class="form-control my-3 mx-auto" style="max-width:300px;">
+                <div id="cropContainer" class="mx-auto"></div>
+                <button @click="submitImage" class="btn btn-danger" id="subBut">Submit</button>
+            </div>
+            <div id="showAbout" class="d-none mx-auto" style="max-width:900px;">
+                <p>Welcome! This website is the live implementation of a cutting-edge machine learning model capable of accurately diagnosing tomato plant diseases using leaf images. Leveraging the power of Convolutional Neural Networks (CNNs) and a rich dataset of tomato leaf images, our model offers timely and reliable disease identification, enabling farmers to take proactive measures and minimize crop losses.</p><p><b>Developed by Team Quantitative Conquerors as a part of the CSRBOX and IBM Data Analytics Internship.</b></p>
+            </div>
+            <div v-if="result.name" class="columns row mt-3" id="mainResult">
+                <div class="column col text-start">
+                    <h3><u>{{ result.name }}</u></h3>
+                    <p class="text-center">{{ Math.round(result.probability*10000)/100 }}% Match<br></p>
+                    <div class="chart-container"><canvas id="donutChart" width="200" height="200"></canvas></div>
+                    <br>
+                    <p>{{ tomatoLeafData[result.name][selectedLanguage]["generalInfo"] }}</p>
+                    <p><b>{{ langCues[selectedLanguage][0] }}</b>{{ tomatoLeafData[result.name][selectedLanguage]["visualCues"] }}</p>
+                    <p><b>{{ langCues[selectedLanguage][1] }}</b>{{ tomatoLeafData[result.name][selectedLanguage]["prevention"] }}</p>
+                    <p><b>{{ langCues[selectedLanguage][2] }}</b>{{ tomatoLeafData[result.name][selectedLanguage]["cure"] }}</p>
+                    <p><b>{{ langCues[selectedLanguage][3] }}</b></p>
+                </div>
+                <div class="column col text-center">
+                    <img v-bind:src="'images/'+result.name+'.jpg'">
+                </div>
+            </div>
+            <p v-if="error" class="mt-3">{{ error }}</p>
+        </div>
+    </div>
+    
+	<script>
+        function createDonutChart(probability) {
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.onload = function() {
+                var donutChart = new Chart(document.getElementById('donutChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['', ''],
+                        datasets: [{
+                            data: [probability, 1 - probability],
+                            backgroundColor: ['#00ff00', '#D3D3D3'],
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            tooltip: {
+                                enabled: false,
+                            },
+                            title: {
+                                display: false,
+                            },
+                        },
+                        cutoutPercentage: 70,
+                    }
+                });
+            };
+
+            document.head.appendChild(script);
+        }
+        
+        new Vue({
+            el: '#app',
+            data: {
+                cropInstance: null,
+                result: {},
+                error: '',
+                tomatoLeafData: tomatoLeafData,
+				langCues: langCues,
+				selectedLanguage:'English',
+            },
+            methods: {
+                reloadPage() {
+                    location.reload();
+                },
+                showAbout() {
+                    document.getElementById('hideThis').classList.add('d-none');
+                    document.getElementById('showAbout').classList.remove('d-none');
+                    document.getElementById('mainResult').classList.add('d-none');
+                },
+                onFileChange(e) {
+                    if (this.cropInstance) {
+                        this.cropInstance.destroy();
+                    }
+                
+                    let reader = new FileReader();
+                    reader.onload = e => {
+                        this.cropInstance = new Croppie(document.getElementById('cropContainer'), {
+                            viewport: { width: 227, height: 227 },
+                            boundary: { width: 300, height: 300 },
+                            enableZoom: true,
+                            zoom: 1,
+                        });
+                        this.cropInstance.bind({
+                            url: e.target.result,
+                        });
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                },
+                submitImage() {
+                    this.cropInstance.result({ type: 'blob', size: 'viewport' }).then(blob => {
+                        let imageType = blob.type.split('/')[1];
+                        let filename = `cropped_image.${imageType}`;
+                        let url = URL.createObjectURL(blob);
+                        let link = document.createElement('a');
+                        link.href = url;
+                        link.download = filename;
+                        document.getElementById('subBut').innerHTML = "Please wait...";
+                        document.getElementById('subBut').classList.remove('btn-danger');
+                        document.getElementById('subBut').classList.add('btn-warning');
+                        setTimeout(() => {
+                            //link.click();
+                            let formData = new FormData();
+                            formData.append('image', blob);
+                            axios.post('https://tomato.sarthakgoelart.repl.co/predict_disease', formData)
+                                .then(response => {
+                                    if (Object.keys(response.data).length === 0) {
+                                        this.error = "No match found.";
+                                    } else {
+                                        document.getElementById('hideThis').classList.add('d-none');
+                                        this.result = response.data;
+                                        createDonutChart(response.data.probability);
+                                    }
+                                })
+                                .catch(error => {
+                                    this.error = error.message;
+                                });
+                        }, 1000);
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
